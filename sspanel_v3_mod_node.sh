@@ -257,12 +257,12 @@ selectApi(){
 	fi
 }
 common_set(){
-	stty erase '^H' && read -p "NODE_ID(num_only):" NODE_ID
-	stty erase '^H' && read -p "SPEEDTEST_CIRCLE(num_only,default:0):" SPEEDTEST
+	stty erase '^H' && read -p "NODE_ID(节点编号):" NODE_ID
+	stty erase '^H' && read -p "SPEEDTEST_CIRCLE(测速周期，default:0):" SPEEDTEST
 	[[ -z ${SPEEDTEST} ]] && SPEEDTEST="0"
-	stty erase '^H' && read -p "CLOUDSAFE_ON(0 or 1,default:0,advise:0!):" CLOUDSAFE
+	stty erase '^H' && read -p "CLOUDSAFE_ON(云安全，非常不建议开启,回车不开启，0 or 1,default:0):" CLOUDSAFE
 	[[ -z ${CLOUDSAFE} ]] && CLOUDSAFE="0"
-	stty erase '^H' && read -p "ANTISSATTACK(0 or 1,default:0):" ANTISSATTACK
+	stty erase '^H' && read -p "ANTISSATTACK(ss攻击抵抗，自动封禁连接方式或密码错误的IP，0 or 1,default:0):" ANTISSATTACK
 	[[ -z ${ANTISSATTACK} ]] && ANTISSATTACK="0"
 	stty erase '^H' && read -p "MU_SUFFIX(default:zhaoj.in):" MU_SUFFIX
 	[[ -z ${MU_SUFFIX} ]] && MU_SUFFIX="zhaoj.in"
