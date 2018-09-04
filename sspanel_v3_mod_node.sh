@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#2018-9-4 09:10:09 十一修改版
 #====================================================
 #	System Request:Debian 7+/Ubuntu 14.04+/Centos 6+
 #	Author:	wulabing
