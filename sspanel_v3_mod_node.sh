@@ -551,7 +551,7 @@ management(){
 		install)
 			install_management
 			chomd +x *.sh
-			./sspanel_v3_mod_node.sh start
+			bash sspanel_v3_mod_node.sh start
 			;;
 		modify)
 			modify_management
