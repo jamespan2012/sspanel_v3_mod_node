@@ -58,11 +58,13 @@ check_system(){
 }
 basic_installation(){
 	if [[ ${ID} == "centos" ]]; then
-		${INS} install tar wget epel-release -y
+		${INS} install tar wget epel-release git -y
+		${INS} update nss curl iptables -y
 	else
 		sed -i '/^deb cdrom/'d /etc/apt/sources.list
 		${INS} update
-		${INS} install tar wget -y
+		${INS} install tar wget git -y
+		${INS} update nss curl iptables -y
 	fi
 }
 
