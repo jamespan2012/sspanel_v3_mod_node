@@ -1,5 +1,6 @@
 #!/bin/bash
 #2018-9-4 09:10:09 十一修改版
+#blog：blog.67cc.cn
 #====================================================
 #	System Request:Debian 7+/Ubuntu 14.04+/Centos 6+
 #	Author:	wulabing
@@ -104,7 +105,7 @@ development_tools_installation(){
 }
 libsodium_installation(){
 	mkdir -p ${libsodium_folder} && cd ${libsodium_folder}
-	wget https://github.com/jedisct1/libsodium/releases/download/1.0.16/libsodium-1.0.16.tar.gz
+	wget --no-check-certificate https://download.libsodium.org/libsodium/releases/libsodium-1.0.16.tar.gz
 	if [[ ! -f ${libsodium_folder}/libsodium-1.0.16.tar.gz ]]; then
 		echo -e "${Error} ${RedBG} libsodium download FAIL ${Font}"
 		exit 1
@@ -270,8 +271,8 @@ common_set(){
 	[[ -z ${MU_REGEX} ]] && MU_REGEX="%5m%id.%suffix"	
 }
 modwebapi_set(){
-	stty erase '^H' && read -p "WEBAPI_URL(example: https://www.zhaoj.in):" WEBAPI_URL
-	stty erase '^H' && read -p "WEBAPI_TOKEN(example: zhaoj.in):" WEBAPI_TOKEN
+	stty erase '^H' && read -p "WEBAPI_URL(对接域名或IP，格式http://www.baidu.com):" WEBAPI_URL
+	stty erase '^H' && read -p "WEBAPI_TOKEN(对接token，配置文件中修改):" WEBAPI_TOKEN
 }
 mysql_set(){
 	stty erase '^H' && read -p "MYSQL_HOST(IP addr or domain):" MYSQL_HOST
@@ -547,6 +548,8 @@ management(){
 	case $1 in
 		install)
 			install_management
+			chomd +x *.sh
+			./sspanel_v3_mod_node.sh start
 			;;
 		modify)
 			modify_management
@@ -576,7 +579,7 @@ management(){
 			fi
 			;;
 		*)
-			echo -e "${Notification} Usage:{start|stop|fstop|status|install|uninstall|modify}"
+			echo -e "${Notification} Usage:{启动：start|停止：stop|重启：restart|状态：status|安装：install|卸载：uninstall|修改：modify}"
 			exit 1
 			;;
 	esac
