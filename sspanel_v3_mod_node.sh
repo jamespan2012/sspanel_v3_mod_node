@@ -550,8 +550,7 @@ management(){
 	case $1 in
 		install)
 			install_management
-			chomd +x *.sh
-			bash sspanel_v3_mod_node.sh start
+			start_management
 			;;
 		modify)
 			modify_management
