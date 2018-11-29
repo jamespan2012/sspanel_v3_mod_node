@@ -250,7 +250,7 @@ SSR_installation(){
 	echo -e "${OK} ${GreenBG} 后端已启动 ${Font}"
 else
 	echo -e "${OK} ${RedBG} 后端未启动 ${Font}"
-	echo -e "请检查是否为Centos 7.x系统、检查配置文件是否正确、检查是否代码错误请反馈"
+	echo -e "请检查配置文件是否正确、检查是否代码错误请反馈"
 	exit 1
 fi
 	echo -e "如果重启，请手动启动SS：
