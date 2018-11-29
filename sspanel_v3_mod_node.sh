@@ -251,7 +251,6 @@ SSR_installation(){
 else
 	echo -e "${OK} ${RedBG} 后端未启动 ${Font}"
 	echo -e "请检查配置文件是否正确、检查是否代码错误请反馈"
-	exit 1
 fi
 	echo -e "如果重启，请手动启动SS：
 启动：./root/shadowsocks/run.sh
