@@ -1,20 +1,19 @@
 #!/bin/bash
 #2018-9-4 09:10:09 十一修改版
 #blog：blog.67cc.cn
+
 #====================================================
 #	System Request:Debian 7+/Ubuntu 14.04+/Centos 6+
 #	Author:	wulabing
 #	Dscription: SSR glzjin server for manyuser (only)
-#	Version: 4.0
+#	Version: 2.1
 #	Blog: https://www.wulabing.com
 #	Special thanks: Toyo
 #====================================================
 
-sh_ver="4.0"
+sh_ver="2.1.1"
 libsodium_folder="/etc/libsodium"
 shadowsocks_install_folder="/root"
-supervisor_dir="/etc/supervisor"
-suerpvisor_conf_dir="${supervisor_dir}/conf.d"
 shadowsocks_folder="${shadowsocks_install_folder}/shadowsocks"
 config="${shadowsocks_folder}/userapiconfig.py"
 debian_sourcelist="/etc/apt/source.list"
@@ -34,72 +33,59 @@ OK="${Green}[OK]${Font}"
 Error="${Red}[Error]${Font}"
 Notification="${Yellow}[Notification]${Font}"
 
-source /etc/os-release &>/dev/null
-
 check_system(){
-    if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]];then
-        echo -e "${OK} ${GreenBG} 当前系统为 Centos ${VERSION_ID} ${Font} "
-        INS="yum"
-    elif [[ "${ID}" == "debian" && ${VERSION_ID} -ge 8 ]];then
-        echo -e "${OK} ${GreenBG} 当前系统为 Debian ${VERSION_ID} ${Font} "
-        INS="apt-get"
-    elif [[ "${ID}" == "ubuntu" && `echo "${VERSION_ID}" | cut -d '.' -f1` -ge 16 ]];then
-        echo -e "${OK} ${GreenBG} 当前系统为 Ubuntu ${VERSION_ID} ${Font} "
-        INS="apt-get"
-	elif [[ `rpm -q centos-release |cut -d - -f1` == "centos" && `rpm -q centos-release |cut -d - -f3` == 6 ]];then
-		echo -e "${OK} ${GreenBG} 当前系统为 Centos 6 ${Font} "
-        INS="yum"
-		ID="centos"
-		VERSION_ID="6"
-    else
-        echo -e "${Error} ${RedBG} 当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内，安装中断 ${Font} "
-        exit 1
-    fi
+	if [[ -f /etc/redhat-system ]]; then
+		system="centos"
+	elif cat /etc/issue | grep -q -E -i "debian"; then
+		system="debian"
+	elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+		system="ubuntu"
+	elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+		system="centos"
+	elif cat /proc/version | grep -q -E -i "debian"; then
+		system="debian"
+	elif cat /proc/version | grep -q -E -i "ubuntu"; then
+		system="ubuntu"
+	elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+		system="centos"
+	else 
+		system="other"
+	fi
 }
 basic_installation(){
-	if [[ ${ID} == "centos" ]]; then
-		${INS} install tar wget epel-release git -y
-		${INS} update nss curl iptables -y
-	else
+	if [[ ${system} == "centos" ]]; then
+		yum -y install vim tar wget git 
+	elif [[ ${system} == "debian" || ${system} == "ubuntu" ]]; then
 		sed -i '/^deb cdrom/'d /etc/apt/sources.list
-		${INS} update
-		${INS} install tar wget git -y
-		${INS} update nss curl iptables -y
+		apt-get update
+		apt-get -y install vim tar wget git 
+	else
+		echo -e "${Error} Don't support this System"
+		exit 1
 	fi
 }
 
 dependency_installation(){
-		${INS} -y install python-setuptools  && easy_install pip
-		if [[ $? -ne 0 ]]; then
-			if [[ ${ID} == "centos" ]];then
-				echo -e "${OK} ${GreenBG} 尝试 yum 安装 python-pip ${Font}"
-				sleep 2
-				yum -y install python-pip 
-			else
-				echo -e "${OK} ${GreenBG} 尝试 apt 安装 python-pip ${Font}"
-				sleep 2
-				apt-get install python-pip -y
-			fi
-			if [[ $? -eq 0 ]]; then
-				echo -e "${OK} ${GreenBG} pip installation Successfully ${Font}"
-				sleep 1
-				else
-				echo -e "${Error} ${RedBG} pip installation FAIL ${Font}"
-				exit 1
-			fi
-		fi
+	if [[ ${system} == "centos" ]]; then
+		yum -y install python-setuptools && easy_install pip
+		yum -y install git
+	elif [[ ${system} == "debian" || ${system} == "ubuntu" ]]; then
+		apt-get -y install python-setuptools && easy_install pip
+		apt-get -y install git
+	fi
+	
 }
 development_tools_installation(){
-	if [[ ${ID} == "centos" ]]; then
-		${INS} groupinstall "Development Tools" -y
+	if [[ ${system} == "centos" ]]; then
+		yum -y groupinstall "Development Tools"
 		if [[ $? -ne 0 ]]; then
-			echo -e "${Error} ${RedBG} Development Tools installation FAIL ${Font}"
+			echo -e "${Error} Development Tools installation FAIL"
 			exit 1
 		fi
 	else
-		${INS} install build-essential -y
+		apt-get -y install build-essential 
 		if [[ $? -ne 0 ]]; then
-			echo -e "${Error} ${RedBG} build-essential installation FAIL ${Font}"
+			echo -e "${Error} build-essential installation FAIL"
 			exit 1
 		fi
 	fi
@@ -107,15 +93,15 @@ development_tools_installation(){
 }
 libsodium_installation(){
 	mkdir -p ${libsodium_folder} && cd ${libsodium_folder}
-	wget --no-check-certificate https://download.libsodium.org/libsodium/releases/libsodium-1.0.16.tar.gz
-	if [[ ! -f ${libsodium_folder}/libsodium-1.0.16.tar.gz ]]; then
-		echo -e "${Error} ${RedBG} libsodium download FAIL ${Font}"
+	wget https://github.com/jedisct1/libsodium/releases/download/1.0.13/libsodium-1.0.13.tar.gz
+	if [[ ! -f ${libsodium_folder}/libsodium-1.0.13.tar.gz ]]; then
+		echo -e "${Error} libsodium download FAIL"
 		exit 1
 	fi
-	tar xf libsodium-1.0.16.tar.gz && cd libsodium-1.0.16
+	tar xf libsodium-1.0.13.tar.gz && cd libsodium-1.0.13
 	./configure && make -j2 && make install
 	if [[ $? -ne 0 ]]; then 
-		echo -e "${Error} ${RedBG} libsodium install FAIL ${Font}"
+		echo -e "${Error} libsodium install FAIL"
 		exit 1
 	fi
 	echo /usr/local/lib > /etc/ld.so.conf.d/usr_local_lib.conf
@@ -125,77 +111,19 @@ libsodium_installation(){
 
 }
 SSR_dependency_installation(){
-	if [[ ${ID} == "centos" ]]; then
+	if [[ ${system} == "centos" ]]; then
 		cd ${shadowsocks_folder}
-		${INS} install python-devel libffi-devel openssl-devel -y
-		pip install -r requirements.txt
-		pip install requests		
+		yum -y install python-devel
+		yum -y install libffi-devel
+		yum -y install openssl-devel
+		pip install requests
+		pip install -r requirements.txt		
 	else
-		pip install cymysql==0.8.4
+		pip install cymysql
 		pip install requests
 	fi
 }
-supervisor_installation(){
-	if [[ ! -d ${shadowsocks_folder} ]]; then
-		read -p "请输入shadowsocks所在目录绝对路径（eg：/root/shadowsocks）" shadowsocks_folder
-	fi
-	if [[ ${ID} == "centos" ]];then
-		yum -y install supervisor
-	else
-		apt-get install supervisor -y
-	fi
-	if [[ $? -ne 0 ]]; then 
-		echo -e "${Error} ${RedBG} supervisor 安装失败 ${Font}"
-		exit 1
-	else
-		echo -e "${OK} ${GreenBG} supervisor 安装成功 ${Font}"
-		sleep 1
-	fi
-	
 
-}
-supervisor_conf_modify_debian(){
-	cat>${suerpvisor_conf_dir}/shadowsocks.conf<<EOF
-[program:shadowsocks]
-command = python ${shadowsocks_folder}/server.py
-stdout_logfile = /var/log/ssmu.log
-stderr_logfile = /var/log/ssmu.log
-user = root
-autostart = true
-autorestart = true
-EOF
-
-	echo -e "${OK} ${GreenBG} supervisor 配置导入成功 ${Font}"
-	sleep 1
-}
-supervisor_conf_modify_ubuntu(){
-	cat>${suerpvisor_conf_dir}/shadowsocks.conf<<EOF
-[program:shadowsocks]
-command = python ${shadowsocks_folder}/server.py
-stdout_logfile = /var/log/ssmu.log
-stderr_logfile = /var/log/ssmu.log
-user = root
-autostart = true
-autorestart = true
-EOF
-
-	echo -e "${OK} ${GreenBG} supervisor 配置导入成功 ${Font}"
-	sleep 1
-}
-supervisor_conf_modify_centos(){
-	cat>>/etc/supervisord.conf<<EOF
-[program:shadowsocks]
-command = python ${shadowsocks_folder}/server.py
-stdout_logfile = /var/log/ssmu.log
-stderr_logfile = /var/log/ssmu.log
-user = root
-autostart = true
-autorestart = true
-EOF
-
-	echo -e "${OK} ${GreenBG} supervisor 配置导入成功 ${Font}"
-	sleep 1
-}
 modify_API(){
 	sed -i '/API_INTERFACE/c \API_INTERFACE = '\'${API}\''' ${config}
 }
@@ -207,9 +135,6 @@ modify_SPEEDTEST(){
 }
 modify_CLOUDSAFE(){
 	sed -i '/CLOUD/c \CLOUDSAFE = '${CLOUDSAFE}'' ${config}
-}
-modify_ANTISSATTACK(){
-	sed -i '/ANTISS/c \ANTISSATTACK = '${ANTISSATTACK}'' ${config}
 }
 modify_MU_SUFFIX(){
 	sed -i '/MU_SUFFIX/c \MU_SUFFIX = '\'${MU_SUFFIX}\''' ${config}
@@ -223,30 +148,15 @@ modify_WEBAPI_URL(){
 modify_WEBAPI_TOKEN(){
 	sed -i '/WEBAPI_TOKEN/c \WEBAPI_TOKEN = '\'${WEBAPI_TOKEN}\''' ${config}
 }
-modify_MYSQL_HOST(){
+modify_MYSQL(){
 	sed -i '/MYSQL_HOST/c \MYSQL_HOST = '\'${MYSQL_HOST}\''' ${config}
-}
-modify_MYSQL_PORT(){
 	sed -i '/MYSQL_PORT/c \MYSQL_PORT = '${MYSQL_PORT}'' ${config}
-}
-modify_MYSQL_USER(){
 	sed -i '/MYSQL_USER/c \MYSQL_USER = '\'${MYSQL_USER}\''' ${config}
-}
-modify_MYSQL_PASS(){
 	sed -i '/MYSQL_PASS/c \MYSQL_PASS = '\'${MYSQL_PASS}\''' ${config}
-}
-modify_MYSQL_DB(){
 	sed -i '/MYSQL_DB/c \MYSQL_DB = '\'${MYSQL_DB}\''' ${config}
 }
-modify_MYSQL(){
-	modify_MYSQL_HOST
-	modify_MYSQL_PASS
-	modify_MYSQL_PORT
-	modify_MYSQL_USER
-	modify_MYSQL_DB
-}
 selectApi(){
-	echo -e "${Yellow} 请选择 API 模式: ${Font}"
+	echo -e "${Yellow}please select the api:${Font}"
 	echo -e "1.modwebapi"
 	echo -e "2.glzjinmod(mysql_connect)"
 	stty erase '^H' && read -p "(default:modwebapi):" API
@@ -261,16 +171,16 @@ selectApi(){
 }
 common_set(){
 	stty erase '^H' && read -p "NODE_ID(节点编号):" NODE_ID
-	stty erase '^H' && read -p "SPEEDTEST_CIRCLE(测速周期，default:0):" SPEEDTEST
-	[[ -z ${SPEEDTEST} ]] && SPEEDTEST="0"
-	stty erase '^H' && read -p "CLOUDSAFE_ON(云安全，非常不建议开启,回车不开启，0 or 1,default:0):" CLOUDSAFE
-	[[ -z ${CLOUDSAFE} ]] && CLOUDSAFE="0"
+    stty erase '^H' && read -p "SPEEDTEST_CIRCLE(测速周期，default:6):" SPEEDTEST
+	[[ -z ${SPEEDTEST} ]] && SPEEDTEST="6"
+	stty erase '^H' && read -p "CLOUDSAFE_ON(云安全，0 or 1,default:1):" CLOUDSAFE
+	[[ -z ${CLOUDSAFE} ]] && CLOUDSAFE="1"
 	stty erase '^H' && read -p "ANTISSATTACK(ss攻击抵抗，自动封禁连接方式或密码错误的IP，0 or 1,default:0):" ANTISSATTACK
 	[[ -z ${ANTISSATTACK} ]] && ANTISSATTACK="0"
 	stty erase '^H' && read -p "MU_SUFFIX(default:zhaoj.in):" MU_SUFFIX
 	[[ -z ${MU_SUFFIX} ]] && MU_SUFFIX="zhaoj.in"
 	stty erase '^H' && read -p "MU_REGEX(default:%5m%id.%suffix):" MU_REGEX
-	[[ -z ${MU_REGEX} ]] && MU_REGEX="%5m%id.%suffix"	
+	[[ -z ${MU_REGEX} ]] && MU_REGEX="%5m%id.%suffix"		
 }
 modwebapi_set(){
 	stty erase '^H' && read -p "WEBAPI_URL(对接域名或IP，格式http://www.baidu.com):" WEBAPI_URL
@@ -283,6 +193,7 @@ mysql_set(){
 	stty erase '^H' && read -p "MYSQL_USER(default:root):" MYSQL_USER
 	[[ -z ${MYSQL_USER} ]] && MYSQL_USER="root"
 	stty erase '^H' && read -p "MYSQL_PASS:" MYSQL_PASS
+	[[ -z ${MYSQL_PASS} ]] && MYSQL_PASS="root"
 	stty erase '^H' && read -p "MYSQL_DB(default:sspanel):" MYSQL_DB
 	[[ -z ${MYSQL_DB} ]] && MYSQL_DB="sspanel"
 }
@@ -298,12 +209,13 @@ modify_ALL(){
 	modify_WEBAPI_URL
 }
 iptables_OFF(){
-	systemctl disable firewalld &>/dev/null
-	systemctl disable iptables &>/dev/null
-	chkconfig iptables off &>/dev/null
-	iptables -F	&>/dev/null
+		systemctl disable firewalld &>/dev/null
+		systemctl disable iptables &>/dev/null
+		chkconfig iptables off &>/dev/null
+		iptables -F	&>/dev/null
 }
 SSR_installation(){
+	check_system
 #select api
 
 	selectApi
@@ -332,258 +244,19 @@ SSR_installation(){
 	modify_ALL
 	iptables_OFF
 
-	echo -e "${OK} ${GreenBG} SSR manyuser for glzjin 安装完成 ${Font}"
-	sleep 1
+	echo -e "${OK} SSR manyuser for glzjin installation complete"
+	chmod +x /root/shadowsocks/run.sh && ./root/shadowsocks/run.sh
+	if [[ `ps -ef | grep server.py |grep -v grep | wc -l` -ge 1 ]];then
+	echo -e "${OK} ${GreenBG} 后端已启动 ${Font}"
+else
+	echo -e "${OK} ${RedBG} 后端未启动 ${Font}"
+	echo -e "请检查是否为Centos 7.x系统、检查配置文件是否正确、检查是否代码错误请反馈"
+	exit 1
+fi
+	echo -e "如果重启，请手动启动SS：
+启动：./root/shadowsocks/run.sh
+启动（日志模式）：./root/shadowsocks/logrun.sh
+停止：./root/shadowsocks/stop.sh
+日志：./root/shadowsocks/tail.sh"
 }
-
-if_install(){
-	[[ -d ${shadowsocks_folder} && -f ${config} ]] && {
-		echo -e "${OK} ${GreenBG} ShadowsocksR glzjin 已安装 ${Font}"
-	} || {
-		echo -e "${Error} ${RedBG} ShadowsocksR glzjin 未安装，请在安装后执行相关操作 ${Font}"
-		exit 1
-	}
-}
-
-option(){
-	echo -e "${Red} 请选择安装内容 ${Font}"
-	echo -e "1. SSR + supervisor"
-	echo -e "2. SSR "
-	echo -e "3. supervisor"
-	read -p "input:" number
-	case ${number} in
-		1)
-			SSR_installation
-			supervisor_installation
-			supervisor_conf_modify_${ID}
-			;;
-		2)
-			SSR_installation
-			;;
-		3)
-			supervisor_installation
-			supervisor_conf_modify_${ID}
-			;;
-		*)
-			echo -e "${Error} ${RedBG} 请输入正确的序号 ${Font}"
-			exit 1
-			;;
-	esac
-}
-modify_module(){
-	read -p "请输入 $1 修改内容: " $1
-	modify_$1
-	[[ $? -eq 0 ]] && {
-		echo -e "${OK} ${GreenBG} $1 修改成功 请重新启动后端 ${Font}"
-	} || {
-		echo -e "${Error} ${RedBG} $1 修改失败 ${Font}"
-	}	
-}
-install_management(){
-		check_system
-		echo -e "${Red} 请选择安装内容 ${Font}"
-		echo -e "1. SSR + supervisor"
-		echo -e "2. SSR "
-		echo -e "3. supervisor"
-		read -p "input:" number
-		case ${number} in
-			1)
-				SSR_installation
-				supervisor_installation
-				supervisor_conf_modify_${ID}
-				;;
-			2)
-				SSR_installation
-				;;
-			3)
-				supervisor_installation
-				supervisor_conf_modify_${ID}
-				;;
-			*)
-				echo -e "${Error} ${RedBG} 请输入正确的序号 ${Font}"
-				exit 1			
-				;;
-		esac
-}
-modify_management(){
-	if_install
-	echo -e "${Red}请选择要修改的内容 ${Font}"
-	echo -e "${GreenBG}   公共内容   ${Font}"
-	echo -e "1. NODE_ID（节点编号）"
-	echo -e "2. SPEEDTEST（测速周期）"
-	echo -e "3. CLOUDSAFE（云安全，非常不建议开启）"
-	echo -e "4. ANTISSATTACK（ss攻击抵抗，自动封禁连接方式或密码错误的IP）"
-	echo -e "5. MU_SUFFIX"
-	echo -e "6. MU_REGEX"
-	echo -e	"${GreenBG}   webapi模式相关内容   ${Font}"
-	echo -e "7. WEBAPI_URL"	
-	echo -e "8. WEBAPI_TOKEN" 
-	echo -e "${GreenBG}   glzjinmod模式相关内容   ${Font}"
-	echo -e "9. MYSQL_HOST（数据库主机）"
-	echo -e "10.MYSQL_PORT（数据库端口）"
-	echo -e "11.MYSQL_USER（数据库用户名）"
-	echo -e "12.MYSQL_PASSWORD（数据库密码）"
-	echo -e "13.MYSQL_DB（数据库名称）"
-	read -p "input:" modify
-	case ${modify} in 
-		1)
-			modify_module "NODE_ID"
-			;;
-		2)
-			modify_module "SPEED_TEST"
-			;;
-		3)
-			modify_module "CLOUDSAFE"
-			;;
-		4)
-			modify_module "ANTISSATTACK"
-			;;
-		5)
-			modify_module "MU_SUFFIX"
-			;;
-		6)
-			modify_module "MU_REGEX"
-			;;
-		7)
-			modify_module "WEBAPI_URL"
-			;;
-		8)
-			modify_module "WEBAPI_TOKEN"
-			;;
-		9)
-			modify_module "MYSQL_HOST"
-			;;
-		10)
-			modify_module "MYSQL_PORT"
-			;;
-		11)
-			modify_module "MYSQL_USER"
-			;;
-		12)
-			modify_module "MYSQL_PASS"
-			;;
-		13)
-			modify_module "MYSQL_DB"
-			;;
-		*)
-			echo -e "${RedBG} 请输入正确的序号 ${Font}"
-			exit 1
-			;;
-	esac
-}
-uninstall_management(){
-	if_install
-	rm -rf ${shadowsocks_folder}
-	echo -e "${OK$ {GreenBG} shadowsocks glzjin 卸载完成 ${Font}"
-	exit 0
-}
-start_management(){
-	command -v supervisord >/dev/null
-	if [[ $? -ne 0  ]];then
-		echo -e "${Notification} 检测到未安装 supervisord"
-		/root/shadowsocks/logrun.sh
-		sleep 2
-		echo -e "${OK} ${GreenBG} 后端已启动 ${Font}"
-	else
-		echo -e "${OK} 检测到已安装 supervisord"
-		command -v systemctl >/dev/null
-		if [[  $? -ne 0 ]];then
-			service supervisord start
-			sleep 2
-			[[ `ps -ef | grep supervisor |grep -v grep | wc -l` -ge 1 ]] && {
-				echo -e "${OK} ${GreenBG} 后端（supervisord）已启动 ${Font}"
-			} || {
-				echo -e "${Error} ${RedBG} 后端启动失败 ${Font}"
-				exit 1
-			}
-		else
-			systemctl start supervisor
-			sleep 2
-			[[ `ps -ef | grep supervisor |grep -v grep | wc -l` -ge 1 ]] && {
-				echo -e "${OK} ${GreenBG} 后端（supervisord）已启动 ${Font}"
-			} || {
-				echo -e "${Error} ${RedBG} 后端启动失败 ${Font}"
-				exit 1
-			}
-		fi
-	fi
-
-}
-stop_management(){
-	command -v supervisord >/dev/null
-	if [[ $? -ne 0 ]];then
-		echo -e "${Notification} 检测到未安装 supervisord"
-		/root/shadowsocks/stop.sh
-		sleep 2
-		echo -e "${OK} ${GreenBG} 后端已关闭 ${Font}"
-	else
-		echo -e "${OK} 检测到已安装 supervisord"
-		command -v systemctl >/dev/null
-		if [[ $? -ne 0 ]];then
-			service supervisord stop
-			sleep 2
-			[[ `ps -ef | grep supervisor |grep -v grep | wc -l` -eq 0 ]] && {
-				echo -e "${OK} ${GreenBG} 后端（supervisord）已关闭 ${Font}"
-			} || {
-				echo -e "${Error} ${RedBG} 后端关闭失败 ${Font}"
-				exit 1
-			}
-		else
-			systemctl stop supervisor
-			sleep 2
-			[[ `ps -ef | grep supervisor |grep -v grep | wc -l` -eq 0 ]] && {
-				echo -e "${OK} ${GreenBG} 后端（supervisord）已关闭 ${Font}"
-			} || {
-				echo -e "${Error} ${RedBG} 后端关闭失败 ${Font}"
-				exit 1
-			}
-		fi
-	fi
-}
-force_stop(){
-	supervisor_pid=` ps -ef | grep supervisor |grep -v grep|awk '{print $2}'`
-	ss_pid=` ps -ef | grep server.py |grep -v grep|awk '{print $2}' `
-	kill -9 ${supervisor_pid} ${ss_pid}
-	echo -e "${OK} ${GreenBG} 后端（supervisord）已关闭 ${Font}"
-}
-management(){
-	case $1 in
-		install)
-			install_management
-			start_management
-			;;
-		modify)
-			modify_management
-			;;
-		uninstall)
-			uninstall_management
-			;;
-		start)
-			start_management
-			;;
-		stop)
-			stop_management
-			;;
-		restart)
-			stop_management
-			start_management
-			;;
-		fstop)
-			force_stop
-			;;
-		status)
-			if [[ `ps -ef | grep server.py |grep -v grep | wc -l` -ge 1 ]];then
-				echo -e "${OK} ${GreenBG} 后端已启动 ${Font}"
-			else
-				echo -e "${OK} ${RedBG} 后端未启动 ${Font}"
-				exit 1
-			fi
-			;;
-		*)
-			echo -e "${Notification} Usage:{启动：start|停止：stop|重启：restart|状态：status|安装：install|卸载：uninstall|修改：modify}"
-			exit 1
-			;;
-	esac
-}
-management $1
-
+SSR_installation
